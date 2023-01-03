@@ -72,6 +72,31 @@ type TransactionType string
 // LendingType define the type of lending (flexible saving, activity, ...)
 type LendingType string
 
+// StakingProduct define the staking product (locked staking, flexible defi staking, locked defi staking, ...)
+type StakingProduct string
+
+// StakingTransactionType define the staking transaction type (subscription, redemption, interest)
+type StakingTransactionType string
+
+// LiquidityOperationType define the type of adding/removing liquidity to a liquidity pool(COMBINATION, SINGLE)
+type LiquidityOperationType string
+
+// SwappingStatus define the status of swap when querying the swap history
+type SwappingStatus int
+
+// LiquidityRewardType define the type of reward we'd claim
+type LiquidityRewardType int
+
+// RewardClaimStatus define the status of claiming a reward
+type RewardClaimStatus int
+
+// RateLimitType define the rate limitation types
+// see https://github.com/binance/binance-spot-api-docs/blob/master/rest-api.md#enum-definitions
+type RateLimitType string
+
+// RateLimitInterval define the rate limitation intervals
+type RateLimitInterval string
+
 // Endpoints
 const (
 	baseAPIMainURL    = "https://api.binance.com"
@@ -167,9 +192,38 @@ const (
 	LendingTypeFixed    LendingType = "CUSTOMIZED_FIXED"
 	LendingTypeActivity LendingType = "ACTIVITY"
 
+	LiquidityOperationTypeCombination LiquidityOperationType = "COMBINATION"
+	LiquidityOperationTypeSingle      LiquidityOperationType = "SINGLE"
+
 	timestampKey  = "timestamp"
 	signatureKey  = "signature"
 	recvWindowKey = "recvWindow"
+
+	StakingProductLockedStaking       = "STAKING"
+	StakingProductFlexibleDeFiStaking = "F_DEFI"
+	StakingProductLockedDeFiStaking   = "L_DEFI"
+
+	StakingTransactionTypeSubscription = "SUBSCRIPTION"
+	StakingTransactionTypeRedemption   = "REDEMPTION"
+	StakingTransactionTypeInterest     = "INTEREST"
+
+	SwappingStatusPending SwappingStatus = 0
+	SwappingStatusDone    SwappingStatus = 1
+	SwappingStatusFailed  SwappingStatus = 2
+
+	RewardTypeTrading   LiquidityRewardType = 0
+	RewardTypeLiquidity LiquidityRewardType = 1
+
+	RewardClaimPending RewardClaimStatus = 0
+	RewardClaimDone    RewardClaimStatus = 1
+
+	RateLimitTypeRequestWeight RateLimitType = "REQUEST_WEIGHT"
+	RateLimitTypeOrders        RateLimitType = "ORDERS"
+	RateLimitTypeRawRequests   RateLimitType = "RAW_REQUESTS"
+
+	RateLimitIntervalSecond RateLimitInterval = "SECOND"
+	RateLimitIntervalMinute RateLimitInterval = "MINUTE"
+	RateLimitIntervalDay    RateLimitInterval = "DAY"
 )
 
 func currentTimestamp() int64 {
@@ -211,7 +265,7 @@ func NewClient(apiKey, secretKey string) *Client {
 	}
 }
 
-//NewProxiedClient passing a proxy url
+// NewProxiedClient passing a proxy url
 func NewProxiedClient(apiKey, secretKey, proxyUrl string) *Client {
 	proxy, err := url.Parse(proxyUrl)
 	if err != nil {
@@ -369,6 +423,12 @@ func (c *Client) callAPI(ctx context.Context, r *request, opts ...RequestOption)
 	return data, nil
 }
 
+// SetApiEndpoint set api Endpoint
+func (c *Client) SetApiEndpoint(url string) *Client {
+	c.BaseURL = url
+	return c
+}
+
 // NewPingService init ping service
 func (c *Client) NewPingService() *PingService {
 	return &PingService{c: c}
@@ -417,6 +477,11 @@ func (c *Client) NewListPricesService() *ListPricesService {
 // NewListBookTickersService init listing booking tickers service
 func (c *Client) NewListBookTickersService() *ListBookTickersService {
 	return &ListBookTickersService{c: c}
+}
+
+// NewListSymbolTickerService init listing symbols tickers
+func (c *Client) NewListSymbolTickerService() *ListSymbolTickerService {
+	return &ListSymbolTickerService{c: c}
 }
 
 // NewCreateOrderService init creating order service
@@ -472,6 +537,16 @@ func (c *Client) NewGetAccountService() *GetAccountService {
 // NewGetAPIKeyPermission init getting API key permission
 func (c *Client) NewGetAPIKeyPermission() *GetAPIKeyPermission {
 	return &GetAPIKeyPermission{c: c}
+}
+
+// NewSavingFlexibleProductPositionsService get flexible products positions (Savings)
+func (c *Client) NewSavingFlexibleProductPositionsService() *SavingFlexibleProductPositionsService {
+	return &SavingFlexibleProductPositionsService{c: c}
+}
+
+// NewSavingFixedProjectPositionsService get fixed project positions (Savings)
+func (c *Client) NewSavingFixedProjectPositionsService() *SavingFixedProjectPositionsService {
+	return &SavingFixedProjectPositionsService{c: c}
 }
 
 // NewListSavingsFlexibleProductsService get flexible products list (Savings)
@@ -547,6 +622,11 @@ func (c *Client) NewCloseUserStreamService() *CloseUserStreamService {
 // NewExchangeInfoService init exchange info service
 func (c *Client) NewExchangeInfoService() *ExchangeInfoService {
 	return &ExchangeInfoService{c: c}
+}
+
+// NewRateLimitService init rate limit service
+func (c *Client) NewRateLimitService() *RateLimitService {
+	return &RateLimitService{c: c}
 }
 
 // NewGetAssetDetailService init get asset detail service
@@ -729,6 +809,11 @@ func (c *Client) NewSubaccountSpotSummaryService() *SubaccountSpotSummaryService
 	return &SubaccountSpotSummaryService{c: c}
 }
 
+// NewSubaccountDepositAddressService init subaccount deposit address service
+func (c *Client) NewSubaccountDepositAddressService() *SubaccountDepositAddressService {
+	return &SubaccountDepositAddressService{c: c}
+}
+
 // NewAssetDividendService init the asset dividend list service
 func (c *Client) NewAssetDividendService() *AssetDividendService {
 	return &AssetDividendService{c: c}
@@ -792,4 +877,94 @@ func (c *Client) NewTradeFeeService() *TradeFeeService {
 // NewC2CTradeHistoryService init the c2c trade history service
 func (c *Client) NewC2CTradeHistoryService() *C2CTradeHistoryService {
 	return &C2CTradeHistoryService{c: c}
+}
+
+// NewStakingProductPositionService init the staking product position service
+func (c *Client) NewStakingProductPositionService() *StakingProductPositionService {
+	return &StakingProductPositionService{c: c}
+}
+
+// NewStakingHistoryService init the staking history service
+func (c *Client) NewStakingHistoryService() *StakingHistoryService {
+	return &StakingHistoryService{c: c}
+}
+
+// NewGetAllLiquidityPoolService init the get all swap pool service
+func (c *Client) NewGetAllLiquidityPoolService() *GetAllLiquidityPoolService {
+	return &GetAllLiquidityPoolService{c: c}
+}
+
+// NewGetLiquidityPoolDetailService init the get liquidity pool detial service
+func (c *Client) NewGetLiquidityPoolDetailService() *GetLiquidityPoolDetailService {
+	return &GetLiquidityPoolDetailService{c: c}
+}
+
+// NewAddLiquidityPreviewService init the add liquidity preview service
+func (c *Client) NewAddLiquidityPreviewService() *AddLiquidityPreviewService {
+	return &AddLiquidityPreviewService{c: c}
+}
+
+// NewGetSwapQuoteService init the add liquidity preview service
+func (c *Client) NewGetSwapQuoteService() *GetSwapQuoteService {
+	return &GetSwapQuoteService{c: c}
+}
+
+// NewSwapService init the swap service
+func (c *Client) NewSwapService() *SwapService {
+	return &SwapService{c: c}
+}
+
+// NewAddLiquidityService init the add liquidity service
+func (c *Client) NewAddLiquidityService() *AddLiquidityService {
+	return &AddLiquidityService{c: c}
+}
+
+// NewGetUserSwapRecordsService init the service for listing the swap records
+func (c *Client) NewGetUserSwapRecordsService() *GetUserSwapRecordsService {
+	return &GetUserSwapRecordsService{c: c}
+}
+
+// NewClaimRewardService init the service for liquidity pool rewarding
+func (c *Client) NewClaimRewardService() *ClaimRewardService {
+	return &ClaimRewardService{c: c}
+}
+
+// NewRemoveLiquidityService init the service to remvoe liquidity
+func (c *Client) NewRemoveLiquidityService() *RemoveLiquidityService {
+	return &RemoveLiquidityService{c: c, assets: []string{}}
+}
+
+// NewQueryClaimedRewardHistoryService init the service to query reward claiming history
+func (c *Client) NewQueryClaimedRewardHistoryService() *QueryClaimedRewardHistoryService {
+	return &QueryClaimedRewardHistoryService{c: c}
+}
+
+// NewGetBNBBurnService init the service to get BNB Burn on spot trade and margin interest
+func (c *Client) NewGetBNBBurnService() *GetBNBBurnService {
+	return &GetBNBBurnService{c: c}
+}
+
+// NewToggleBNBBurnService init the service to toggle BNB Burn on spot trade and margin interest
+func (c *Client) NewToggleBNBBurnService() *ToggleBNBBurnService {
+	return &ToggleBNBBurnService{c: c}
+}
+
+// NewInternalUniversalTransferService Universal Transfer (For Master Account)
+func (c *Client) NewInternalUniversalTransferService() *InternalUniversalTransferService {
+	return &InternalUniversalTransferService{c: c}
+}
+
+// NewInternalUniversalTransferHistoryService Query Universal Transfer History (For Master Account)
+func (c *Client) NewInternalUniversalTransferHistoryService() *InternalUniversalTransferHistoryService {
+	return &InternalUniversalTransferHistoryService{c: c}
+}
+
+// NewSubAccountListService Query Sub-account List (For Master Account)
+func (c *Client) NewSubAccountListService() *SubAccountListService {
+	return &SubAccountListService{c: c}
+}
+
+// NewGetUserAsset Get user assets, just for positive data
+func (c *Client) NewGetUserAsset() *GetUserAssetService {
+	return &GetUserAssetService{c: c}
 }
